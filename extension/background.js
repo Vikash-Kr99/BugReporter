@@ -1,0 +1,1 @@
+console.log("AI Bug Reporter background service started");

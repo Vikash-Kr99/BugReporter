@@ -1,0 +1,180 @@
+body {
+    margin: 0;
+    padding: 0;
+
+    width: 380px;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background: #f5f7fa;
+}
+
+.container {
+    padding: 18px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    margin-bottom: 18px;
+}
+
+.bug-icon {
+    font-size: 32px;
+}
+
+h2 {
+    margin: 0;
+
+    font-size: 20px;
+}
+
+.header p {
+    margin: 4px 0 0;
+
+    color: #666;
+
+    font-size: 12px;
+}
+
+label {
+    display: block;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    margin-bottom: 7px;
+}
+
+textarea {
+    width: 100%;
+    height: 90px;
+
+    box-sizing: border-box;
+
+    resize: vertical;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    padding: 10px;
+
+    font-size: 13px;
+
+    outline: none;
+}
+
+textarea:focus {
+    border-color: #2874f0;
+}
+
+button {
+    width: 100%;
+
+    margin-top: 12px;
+
+    padding: 11px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: #2874f0;
+    color: white;
+
+    font-size: 14px;
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.loading {
+    margin-top: 12px;
+
+    text-align: center;
+
+    font-size: 12px;
+
+    color: #555;
+}
+
+.hidden {
+    display: none;
+}
+
+.result {
+    margin-top: 18px;
+
+    background: white;
+
+    border-radius: 8px;
+
+    padding: 14px;
+
+    border: 1px solid #ddd;
+}
+
+.result h3 {
+    margin-top: 0;
+}
+
+.field {
+    margin-bottom: 12px;
+}
+
+.field span,
+.screenshot-container > span {
+    display: block;
+
+    font-size: 11px;
+
+    font-weight: bold;
+
+    color: #777;
+
+    margin-bottom: 4px;
+}
+
+.field p {
+    margin: 0;
+
+    font-size: 12px;
+
+    word-break: break-all;
+}
+
+.screenshot-container {
+    margin-top: 12px;
+}
+
+.screenshot-container img {
+    width: 100%;
+
+    margin-top: 6px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 5px;
+}
+
+.error {
+    margin-top: 12px;
+
+    padding: 10px;
+
+    background: #ffe5e5;
+
+    color: #c00;
+
+    border-radius: 5px;
+
+    font-size: 12px;
+}

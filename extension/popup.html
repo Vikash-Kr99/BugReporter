@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Bug Reporter</title>
+
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <div class="header">
+            <div class="bug-icon">🐞</div>
+
+            <div>
+                <h2>AI Bug Reporter</h2>
+                <p>Report bugs faster</p>
+            </div>
+        </div>
+
+        <label for="description">
+            Describe the issue
+        </label>
+
+        <textarea
+            id="description"
+            placeholder="Example: Phone option is not appearing on dashboard..."
+        ></textarea>
+
+
+        <button id="startCapture">
+         ▶️ Start Recording
+       </button>
+
+       <button id="stopCapture" disabled>
+       ⏹️ Stop Recording
+       </button>
+
+       <button id="reportBug" disabled>
+       📸 Capture & Report Bug
+       </button>
+
+        <div id="loading" class="loading hidden">
+            Capturing bug information...
+        </div>
+
+        <div id="result" class="result hidden">
+
+            <h3>Bug Information</h3>
+
+            <div class="field">
+                <span>Description</span>
+                <p id="resultDescription"></p>
+            </div>
+
+            <div class="field">
+                <span>URL</span>
+                <p id="resultUrl"></p>
+            </div>
+
+            <div class="field">
+                <span>Page Title</span>
+                <p id="resultTitle"></p>
+            </div>
+
+            <div class="field">
+                <span>Browser</span>
+                <p id="resultBrowser"></p>
+            </div>
+
+            <div class="field">
+                <span>Captured At</span>
+                <p id="resultTime"></p>
+            </div>
+
+
+            <div class="field">
+              <span>Steps to Reproduce</span>
+              <div id="stepsToReproduce"></div>
+            </div>
+
+           <div class="field">
+              <span>Actual Result</span>
+              <p id="actualResult"></p>
+        </div>
+
+         <div class="field">
+           <span>Expected Result</span>
+           <p id="expectedResult"></p>
+        </div>
+
+       <div class="field">
+         <span>User Actions</span>
+         <div id="userActions"></div>
+       </div>
+
+   
+
+            <div class="screenshot-container">
+
+                <span>Screenshot</span>
+
+                <img
+                    id="screenshot"
+                    alt="Bug Screenshot"
+                >
+
+            </div>
+
+            <button id="copyJson">
+                📋 Copy Bug Data
+            </button>
+
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+    </div>
+
+    <script src="popup.js"></script>
+
+</body>
+
+</html>
