@@ -3,14 +3,17 @@
 
   "name": "AI Bug Reporter",
 
-  "version": "1.1.0",
+  "version": "1.2.0",
 
   "description": "AI powered bug reporting Chrome extension",
 
   "permissions": [
     "activeTab",
     "tabs",
-    "storage"
+    "storage",
+    "tabCapture",
+    "offscreen",
+    "downloads"
   ],
 
   "host_permissions": [

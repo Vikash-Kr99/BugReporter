@@ -14,14 +14,34 @@
 
     <div class="container">
 
+        <!-- ========================================== -->
+        <!-- HEADER -->
+        <!-- ========================================== -->
+
         <div class="header">
-            <div class="bug-icon">🐞</div>
+
+            <div class="bug-icon">
+                🐞
+            </div>
 
             <div>
-                <h2>AI Bug Reporter</h2>
-                <p>Report bugs faster</p>
+
+                <h2>
+                    AI Bug Reporter
+                </h2>
+
+                <p>
+                    Report bugs faster
+                </p>
+
             </div>
+
         </div>
+
+
+        <!-- ========================================== -->
+        <!-- BUG DESCRIPTION -->
+        <!-- ========================================== -->
 
         <label for="description">
             Describe the issue
@@ -33,77 +53,227 @@
         ></textarea>
 
 
+        <!-- ========================================== -->
+        <!-- RECORDING BUTTONS -->
+        <!-- ========================================== -->
+
         <button id="startCapture">
-         ▶️ Start Recording
-       </button>
+            ▶️ Start Recording
+        </button>
 
-       <button id="stopCapture" disabled>
-       ⏹️ Stop Recording
-       </button>
+        <button
+            id="stopCapture"
+            disabled
+        >
+            ⏹️ Stop Recording
+        </button>
 
-       <button id="reportBug" disabled>
-       📸 Capture & Report Bug
-       </button>
+        <button
+            id="reportBug"
+            disabled
+        >
+            📸 Capture & Report Bug
+        </button>
 
-        <div id="loading" class="loading hidden">
+
+        <!-- ========================================== -->
+        <!-- LOADING -->
+        <!-- ========================================== -->
+
+        <div
+            id="loading"
+            class="loading hidden"
+        >
             Capturing bug information...
         </div>
 
-        <div id="result" class="result hidden">
 
-            <h3>Bug Information</h3>
+        <!-- ========================================== -->
+        <!-- RESULT -->
+        <!-- ========================================== -->
+
+        <div
+            id="result"
+            class="result hidden"
+        >
+
+            <h3>
+                Bug Information
+            </h3>
+
+
+            <!-- ====================================== -->
+            <!-- DESCRIPTION -->
+            <!-- ====================================== -->
 
             <div class="field">
-                <span>Description</span>
+
+                <span>
+                    Description
+                </span>
+
                 <p id="resultDescription"></p>
+
             </div>
 
+
+            <!-- ====================================== -->
+            <!-- URL -->
+            <!-- ====================================== -->
+
             <div class="field">
-                <span>URL</span>
+
+                <span>
+                    URL
+                </span>
+
                 <p id="resultUrl"></p>
+
             </div>
 
+
+            <!-- ====================================== -->
+            <!-- PAGE TITLE -->
+            <!-- ====================================== -->
+
             <div class="field">
-                <span>Page Title</span>
+
+                <span>
+                    Page Title
+                </span>
+
                 <p id="resultTitle"></p>
+
             </div>
 
+
+            <!-- ====================================== -->
+            <!-- BROWSER -->
+            <!-- ====================================== -->
+
             <div class="field">
-                <span>Browser</span>
+
+                <span>
+                    Browser
+                </span>
+
                 <p id="resultBrowser"></p>
+
             </div>
 
+
+            <!-- ====================================== -->
+            <!-- CAPTURED TIME -->
+            <!-- ====================================== -->
+
             <div class="field">
-                <span>Captured At</span>
+
+                <span>
+                    Captured At
+                </span>
+
                 <p id="resultTime"></p>
+
             </div>
 
+
+            <!-- ====================================== -->
+            <!-- STEPS TO REPRODUCE -->
+            <!-- ====================================== -->
 
             <div class="field">
-              <span>Steps to Reproduce</span>
-              <div id="stepsToReproduce"></div>
+
+                <span>
+                    Steps to Reproduce
+                </span>
+
+                <div id="stepsToReproduce"></div>
+
             </div>
 
-           <div class="field">
-              <span>Actual Result</span>
-              <p id="actualResult"></p>
-        </div>
 
-         <div class="field">
-           <span>Expected Result</span>
-           <p id="expectedResult"></p>
-        </div>
+            <!-- ====================================== -->
+            <!-- ACTUAL RESULT -->
+            <!-- ====================================== -->
 
-       <div class="field">
-         <span>User Actions</span>
-         <div id="userActions"></div>
-       </div>
+            <div class="field">
 
-   
+                <span>
+                    Actual Result
+                </span>
+
+                <p id="actualResult"></p>
+
+            </div>
+
+
+            <!-- ====================================== -->
+            <!-- EXPECTED RESULT -->
+            <!-- ====================================== -->
+
+            <div class="field expected-result-section">
+
+                <span>
+                    Expected Result
+                </span>
+
+                <textarea
+                    id="expectedResultInput"
+                    placeholder="Expected result will be generated automatically..."
+                    rows="4"
+                ></textarea>
+
+
+                <div class="expected-result-actions">
+
+                    <button id="saveExpectedResult">
+                        💾 Save Expected Result
+                    </button>
+
+                    <span
+                        id="expectedResultSaved"
+                        class="saved-message hidden"
+                    >
+                        ✅ Saved
+                    </span>
+
+                </div>
+
+
+                <!-- Rule Engine / AI Fallback status -->
+
+                <small
+                    id="expectedResultSource"
+                    class="expected-source"
+                ></small>
+
+            </div>
+
+
+            <!-- ====================================== -->
+            <!-- USER ACTIONS -->
+            <!-- ====================================== -->
+
+            <div class="field">
+
+                <span>
+                    User Actions
+                </span>
+
+                <div id="userActions"></div>
+
+            </div>
+
+
+            <!-- ====================================== -->
+            <!-- SCREENSHOT -->
+            <!-- ====================================== -->
 
             <div class="screenshot-container">
 
-                <span>Screenshot</span>
+                <span>
+                    Screenshot
+                </span>
 
                 <img
                     id="screenshot"
@@ -112,15 +282,50 @@
 
             </div>
 
+            <div class="video-container">
+
+    <span>Bug Video</span>
+
+    <video
+        id="bugVideo"
+        controls
+        style="width: 100%; margin-top: 10px;"
+    >
+    </video>
+
+    <p id="videoStatus">
+        No video available.
+    </p>
+
+</div>
+
+
+            <!-- ====================================== -->
+            <!-- COPY JSON -->
+            <!-- ====================================== -->
+
             <button id="copyJson">
                 📋 Copy Bug Data
             </button>
 
         </div>
 
-        <div id="error" class="error hidden"></div>
+
+        <!-- ========================================== -->
+        <!-- ERROR -->
+        <!-- ========================================== -->
+
+        <div
+            id="error"
+            class="error hidden"
+        ></div>
 
     </div>
+
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT -->
+    <!-- ========================================== -->
 
     <script src="popup.js"></script>
 

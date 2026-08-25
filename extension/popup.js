@@ -1,61 +1,50 @@
-const reportBugButton =
-    document.getElementById("reportBug");
+const reportBugButton = document.getElementById("reportBug");
+const startCaptureButton = document.getElementById("startCapture");
+const stopCaptureButton = document.getElementById("stopCapture");
+const descriptionInput = document.getElementById("description");
+const loading = document.getElementById("loading");
+const result = document.getElementById("result");
+const error = document.getElementById("error");
+const copyJsonButton = document.getElementById("copyJson");
 
-const startCaptureButton =
-    document.getElementById("startCapture");
+// Expected Result Edit Controls
+const expectedResultInput =
+    document.getElementById("expectedResultInput");
 
-const stopCaptureButton =
-    document.getElementById("stopCapture");
+const saveExpectedResultButton =
+    document.getElementById("saveExpectedResult");
 
-const descriptionInput =
-    document.getElementById("description");
-
-const loading =
-    document.getElementById("loading");
-
-const result =
-    document.getElementById("result");
-
-const error =
-    document.getElementById("error");
-
-const copyJsonButton =
-    document.getElementById("copyJson");
+const expectedResultSaved =
+    document.getElementById("expectedResultSaved");
 
 let bugData = null;
+let expectedResultSource = "DEFAULT";
+
+
+// ==========================================
+// RESTORE RECORDING STATE
+// ==========================================
 
 async function restoreRecordingState() {
-
     try {
+        const storage = await chrome.storage.local.get([
+            "captureActive",
+            "userActions"
+        ]);
 
-        const result =
-            await chrome.storage.local.get([
-                "captureActive",
-                "userActions"
-            ]);
+        const captureActive = storage.captureActive === true;
+        const actions = storage.userActions || [];
 
-        const captureActive =
-            result.captureActive === true;
-
-        const actions =
-            result.userActions || [];
-
-        console.log(
-            "Recording state:",
-            captureActive
-        );
-
-        console.log(
-            "Current actions:",
-            actions
-        );
+        console.log("Restoring recording state:", {
+            captureActive,
+            actionsCount: actions.length
+        });
 
         if (captureActive) {
 
+            // Recording is already running
             startCaptureButton.disabled = true;
-
             stopCaptureButton.disabled = false;
-
             reportBugButton.disabled = true;
 
             startCaptureButton.textContent =
@@ -63,8 +52,8 @@ async function restoreRecordingState() {
 
         } else {
 
+            // Recording is not running
             startCaptureButton.disabled = false;
-
             stopCaptureButton.disabled = true;
 
             reportBugButton.disabled =
@@ -74,17 +63,25 @@ async function restoreRecordingState() {
                 "▶️ Start Recording";
         }
 
-    } catch (error) {
+    } catch (err) {
 
         console.error(
             "Unable to restore recording state:",
-            error
+            err
         );
+
+        // IMPORTANT
+        // Always make Start Recording clickable
+        startCaptureButton.disabled = false;
+        stopCaptureButton.disabled = true;
+        reportBugButton.disabled = true;
+
+        startCaptureButton.textContent =
+            "▶️ Start Recording";
     }
 }
 
 restoreRecordingState();
-
 
 
 // ==========================================
@@ -97,38 +94,96 @@ startCaptureButton.addEventListener(
 
         try {
 
-            // Clear previous actions
+            console.log(
+                "Start Recording clicked."
+            );
+
+
+            // ==========================================
+            // RESET OLD DATA
+            // ==========================================
+
             await chrome.storage.local.set({
                 userActions: [],
-                captureActive: true
+                captureActive: true,
+                videoRecordingActive: false,
+                videoRecordingError: ""
             });
 
-            console.log(
-                "Recording started."
-            );
 
-            console.log(
-                "Old actions cleared."
-            );
+            // ==========================================
+            // START VIDEO
+            // ==========================================
+
+            try {
+
+                const response =
+                    await chrome.runtime.sendMessage({
+                        type: "START_VIDEO"
+                    });
+
+                console.log(
+                    "Video start response:",
+                    response
+                );
+
+            } catch (videoError) {
+
+                console.error(
+                    "Video recording could not start:",
+                    videoError
+                );
+
+                // Video fail hone par bhi
+                // action recording continue rahegi.
+            }
+
+
+            // ==========================================
+            // UPDATE BUTTONS
+            // ==========================================
 
             startCaptureButton.disabled = true;
-
             stopCaptureButton.disabled = false;
-
             reportBugButton.disabled = true;
 
             startCaptureButton.textContent =
                 "🔴 Recording...";
 
-            // Close popup after starting
+
+            console.log(
+                "Action recording started."
+            );
+
+
+            // ==========================================
+            // CLOSE POPUP
+            // ==========================================
+
             window.close();
 
-        } catch (error) {
+        } catch (err) {
 
             console.error(
                 "Start recording failed:",
-                error
+                err
             );
+
+
+            // ==========================================
+            // SAFETY RESET
+            // ==========================================
+
+            await chrome.storage.local.set({
+                captureActive: false
+            });
+
+            startCaptureButton.disabled = false;
+            stopCaptureButton.disabled = true;
+            reportBugButton.disabled = true;
+
+            startCaptureButton.textContent =
+                "▶️ Start Recording";
 
             showError(
                 "Unable to start recording."
@@ -137,35 +192,79 @@ startCaptureButton.addEventListener(
     }
 );
 
+
+// ==========================================
+// STOP CAPTURE
+// ==========================================
+
 stopCaptureButton.addEventListener(
     "click",
     async () => {
 
         try {
 
-            const result =
-                await chrome.storage.local.get([
-                    "userActions"
-                ]);
+            console.log(
+                "Stop Recording clicked."
+            );
 
-            const actions =
-                result.userActions || [];
+
+            // ==========================================
+            // STOP ACTION RECORDING
+            // ==========================================
 
             await chrome.storage.local.set({
                 captureActive: false
             });
 
-            console.log(
-                "Recording stopped."
-            );
+
+            // ==========================================
+            // GET ACTIONS
+            // ==========================================
+
+            const storage =
+                await chrome.storage.local.get([
+                    "userActions"
+                ]);
+
+            const actions =
+                storage.userActions || [];
 
             console.log(
                 "Captured actions:",
                 actions
             );
 
-            startCaptureButton.disabled = false;
 
+            // ==========================================
+            // STOP VIDEO
+            // ==========================================
+
+            try {
+
+                const response =
+                    await chrome.runtime.sendMessage({
+                        type: "STOP_VIDEO"
+                    });
+
+                console.log(
+                    "Video stop response:",
+                    response
+                );
+
+            } catch (videoError) {
+
+                console.error(
+                    "Unable to stop video:",
+                    videoError
+                );
+            }
+
+
+            // ==========================================
+            // UPDATE BUTTONS
+            // ==========================================
+
+            startCaptureButton.disabled = false;
             stopCaptureButton.disabled = true;
 
             reportBugButton.disabled =
@@ -174,12 +273,32 @@ stopCaptureButton.addEventListener(
             startCaptureButton.textContent =
                 "▶️ Start Recording";
 
-        } catch (error) {
+
+            console.log(
+                "Recording stopped successfully."
+            );
+
+        } catch (err) {
 
             console.error(
                 "Stop recording failed:",
-                error
+                err
             );
+
+
+            // ==========================================
+            // FORCE RESET
+            // ==========================================
+
+            await chrome.storage.local.set({
+                captureActive: false
+            });
+
+            startCaptureButton.disabled = false;
+            stopCaptureButton.disabled = true;
+
+            startCaptureButton.textContent =
+                "▶️ Start Recording";
 
             showError(
                 "Unable to stop recording."
@@ -193,239 +312,483 @@ stopCaptureButton.addEventListener(
 // REPORT BUG
 // ==========================================
 
-reportBugButton.addEventListener("click", async () => {
+reportBugButton.addEventListener(
+    "click",
+    async () => {
 
-    try {
+        try {
 
-        hideError();
-
-        const description =
-            descriptionInput.value.trim();
+            hideError();
 
 
-        // --------------------------------------
-        // Validate description
-        // --------------------------------------
+            // ==========================================
+            // DESCRIPTION / ACTUAL RESULT
+            // ==========================================
 
-        if (!description) {
+            const description =
+                descriptionInput.value.trim();
 
-            showError(
-                "Please describe the bug first."
+            if (!description) {
+
+                showError(
+                    "Please describe the bug first."
+                );
+
+                return;
+            }
+
+
+            // ==========================================
+            // SHOW LOADING
+            // ==========================================
+
+            loading.classList.remove("hidden");
+            result.classList.add("hidden");
+
+            reportBugButton.disabled = true;
+
+
+            // ==========================================
+            // GET ACTIVE TAB
+            // ==========================================
+
+            const tabs =
+                await chrome.tabs.query({
+                    active: true,
+                    currentWindow: true
+                });
+
+            if (!tabs || tabs.length === 0) {
+
+                throw new Error(
+                    "Active tab could not be found."
+                );
+            }
+
+            const tab = tabs[0];
+
+
+            // ==========================================
+            // CAPTURE SCREENSHOT
+            // ==========================================
+
+            const screenshot =
+                await chrome.tabs.captureVisibleTab(
+                    null,
+                    {
+                        format: "png"
+                    }
+                );
+
+
+            // ==========================================
+            // GET SAVED VIDEO
+            // ==========================================
+
+            let savedVideo = null;
+
+            try {
+
+                savedVideo =
+                    await getLatestBugVideo();
+
+                if (savedVideo) {
+
+                    console.log(
+                        "Saved bug video found."
+                    );
+
+                } else {
+
+                    console.log(
+                        "No saved bug video found."
+                    );
+                }
+
+            } catch (videoError) {
+
+                console.error(
+                    "Unable to get saved bug video:",
+                    videoError
+                );
+            }
+
+
+            // ==========================================
+            // BROWSER INFORMATION
+            // ==========================================
+
+            const browserInfo =
+                getBrowserInfo();
+
+
+            // ==========================================
+            // GET USER ACTIONS
+            // ==========================================
+
+            const actionData =
+                await chrome.storage.local.get([
+                    "userActions"
+                ]);
+
+            const userActions =
+                actionData.userActions || [];
+
+            console.log(
+                "CAPTURED USER ACTIONS:",
+                userActions
             );
 
-            return;
-        }
+
+            // ==========================================
+            // GENERATE CLEAN USER ACTIONS
+            // ==========================================
+
+            const cleanUserActions =
+                generateUserActions(
+                    userActions
+                );
+
+            console.log(
+                "CLEAN USER ACTIONS:",
+                cleanUserActions
+            );
 
 
-        // --------------------------------------
-        // Show loading
-        // --------------------------------------
+            // ==========================================
+            // GENERATE STEPS
+            // ==========================================
 
-        loading.classList.remove("hidden");
+            const generatedSteps =
+                generateSteps(
+                    userActions
+                );
 
-        result.classList.add("hidden");
+            console.log(
+                "GENERATED STEPS:",
+                generatedSteps
+            );
 
-        reportBugButton.disabled = true;
+
+            // ==========================================
+            // GENERATE EXPECTED RESULT
+            // ==========================================
+
+            const generatedExpectedResult =
+                generateExpectedResult(
+                    description
+                );
+
+            console.log(
+                "EXPECTED RESULT:",
+                generatedExpectedResult
+            );
+
+            console.log(
+                "EXPECTED RESULT SOURCE:",
+                expectedResultSource
+            );
 
 
-        // --------------------------------------
-        // Get active tab
-        // --------------------------------------
+            // ==========================================
+            // CREATE BUG OBJECT
+            // ==========================================
 
-        const tabs =
-            await chrome.tabs.query({
-                active: true,
-                currentWindow: true
+            bugData = {
+
+                bugTitle:
+                    generateBugTitle(
+                        description
+                    ),
+
+                description:
+                    description,
+
+                url:
+                    tab.url || "",
+
+                pageTitle:
+                    tab.title || "",
+
+                browser:
+                    browserInfo.browser,
+
+                browserVersion:
+                    browserInfo.version,
+
+                userAgent:
+                    navigator.userAgent,
+
+                capturedAt:
+                    new Date().toISOString(),
+
+
+                // ======================================
+                // STEPS TO REPRODUCE
+                // ======================================
+
+                stepsToReproduce:
+                    generatedSteps,
+
+
+                // ======================================
+                // ACTUAL RESULT
+                // ======================================
+
+                actualResult:
+                    description,
+
+
+                // ======================================
+                // EXPECTED RESULT
+                // ======================================
+
+                expectedResult:
+                    generatedExpectedResult,
+
+
+                // ======================================
+                // EXPECTED RESULT SOURCE
+                // ======================================
+
+                expectedResultSource:
+                    expectedResultSource,
+
+
+                // ======================================
+                // USER ACTIONS
+                // ======================================
+
+                userActions:
+                    cleanUserActions,
+
+
+                // ======================================
+                // SCREENSHOT
+                // ======================================
+
+                screenshot:
+                    screenshot,
+
+
+                // ======================================
+                // VIDEO RECORDING
+                // ======================================
+
+                video: {
+                    available:
+                        !!savedVideo
+                }
+            };
+
+
+            // ==========================================
+            // STOP RECORDING
+            // ==========================================
+
+            await chrome.storage.local.set({
+                captureActive: false
+            });
+
+            startCaptureButton.disabled = false;
+            stopCaptureButton.disabled = true;
+            reportBugButton.disabled = true;
+
+            startCaptureButton.textContent =
+                "▶️ Start Recording";
+
+
+            // ==========================================
+            // STORE BUG DATA
+            // ==========================================
+
+            await chrome.storage.local.set({
+                lastBugReport:
+                    bugData
             });
 
 
-        if (!tabs || tabs.length === 0) {
-
-            throw new Error(
-                "Active tab could not be found."
-            );
-        }
-
-
-        const tab = tabs[0];
-
-
-        // --------------------------------------
-        // Capture screenshot
-        // --------------------------------------
-
-        const screenshot =
-            await chrome.tabs.captureVisibleTab(
-                null,
-                {
-                    format: "png"
-                }
-            );
-
-
-        // --------------------------------------
-        // Get browser information
-        // --------------------------------------
-
-        const browserInfo =
-            getBrowserInfo();
-
-            // --------------------------------------
-// Get User Actions
-// --------------------------------------
-// --------------------------------------
-// Get User Actions
-// --------------------------------------
-const actionData = await chrome.storage.local.get([
-    "userActions"
-]);
-
-const userActions =
-    actionData.userActions || [];
-
-console.log("CAPTURED USER ACTIONS:", userActions);
-
-
-        // --------------------------------------
-        // Create bug object
-        // --------------------------------------
-
-bugData = {
-
-    bugTitle:
-        generateBugTitle(description),
-
-    description:
-        description,
-
-    url:
-        tab.url || "",
-
-    pageTitle:
-        tab.title || "",
-
-    browser:
-        browserInfo.browser,
-
-    browserVersion:
-        browserInfo.version,
-
-    userAgent:
-        navigator.userAgent,
-
-    capturedAt:
-        new Date().toISOString(),
-
-    stepsToReproduce:
-        generateSteps(userActions),
-
-    actualResult:
-        description,
-
-    expectedResult:
-        generateExpectedResult(description),
-
-    userActions:
-        userActions,
-
-    screenshot:
-        screenshot
-};
-
-// Stop recording
-await chrome.storage.local.set({
-    captureActive: false
-});
-
-startCaptureButton.disabled = false;
-
-stopCaptureButton.disabled = true;
-
-reportBugButton.disabled = true;
-
-startCaptureButton.textContent =
-    "▶️ Start Recording";
-
-
-        console.log(
-            "BUG DATA:",
-            bugData
-        );
-
-        console.log(
-    "EXPECTED RESULT GENERATED:",
-    bugData.expectedResult
-);
-
-
-        // --------------------------------------
-        // Store locally
-        // --------------------------------------
-
-        await chrome.storage.local.set({
-
-            lastBugReport:
+            console.log(
+                "BUG DATA:",
                 bugData
-
-        });
-
-
-        // --------------------------------------
-        // Display result
-        // --------------------------------------
-
-        displayBugData(
-            bugData
-        );
+            );
 
 
-    } catch (err) {
+            // ==========================================
+            // DISPLAY RESULT
+            // ==========================================
 
-        console.error(
-            "Bug capture failed:",
-            err
-        );
+            await displayBugData(
+                bugData
+            );
 
-        showError(
-            err.message ||
-            "Something went wrong while capturing bug."
-        );
+        } catch (err) {
 
-    } finally {
+            console.error(
+                "Bug capture failed:",
+                err
+            );
 
-        loading.classList.add("hidden");
+            showError(
+                err.message ||
+                "Something went wrong while capturing bug."
+            );
 
-        reportBugButton.disabled = false;
+        } finally {
 
+            loading.classList.add("hidden");
+
+            // Only enable Report Bug if there is
+            // captured data available
+            try {
+
+                const storage =
+                    await chrome.storage.local.get([
+                        "userActions"
+                    ]);
+
+                const actions =
+                    storage.userActions || [];
+
+                reportBugButton.disabled =
+                    actions.length === 0;
+
+            } catch (e) {
+
+                reportBugButton.disabled = false;
+            }
+        }
     }
-
-});
+);
 
 
 // ==========================================
 // DISPLAY BUG DATA
 // ==========================================
 
-function displayBugData(data) {
+async function displayBugData(data) {
 
     // ==========================================
-    // BASIC BUG INFORMATION
+    // EDITABLE EXPECTED RESULT
     // ==========================================
 
-    document.getElementById("resultDescription").textContent =
-        data.description || "";
+    const expectedResultInputElement =
+        document.getElementById(
+            "expectedResultInput"
+        );
 
-    document.getElementById("resultUrl").textContent =
-        data.url || "";
+    if (expectedResultInputElement) {
 
-    document.getElementById("resultTitle").textContent =
-        data.pageTitle || "";
+        expectedResultInputElement.value =
+            data.expectedResult || "";
+    }
 
-    document.getElementById("resultBrowser").textContent =
-        `${data.browser || ""} ${data.browserVersion || ""}`;
 
-    document.getElementById("resultTime").textContent =
-        data.capturedAt || "";
+    // ==========================================
+    // EXPECTED RESULT SOURCE
+    // ==========================================
+
+    const expectedResultSourceElement =
+        document.getElementById(
+            "expectedResultSource"
+        );
+
+    if (expectedResultSourceElement) {
+
+        if (
+            data.expectedResultSource ===
+            "AI_FALLBACK"
+        ) {
+
+            expectedResultSourceElement.textContent =
+                "🤖 Generated using AI Fallback";
+
+        } else if (
+            data.expectedResultSource ===
+            "RULE_ENGINE"
+        ) {
+
+            expectedResultSourceElement.textContent =
+                "⚙️ Generated using Rule Engine";
+
+        } else if (
+            data.expectedResultSource ===
+            "MANUAL"
+        ) {
+
+            expectedResultSourceElement.textContent =
+                "✏️ Manually edited";
+
+        } else {
+
+            expectedResultSourceElement.textContent =
+                "Generated automatically";
+        }
+    }
+
+
+    // ==========================================
+    // URL
+    // ==========================================
+
+    const resultUrl =
+        document.getElementById(
+            "resultUrl"
+        );
+
+    if (resultUrl) {
+
+        resultUrl.textContent =
+            data.url || "";
+    }
+
+
+    // ==========================================
+    // PAGE TITLE
+    // ==========================================
+
+    const resultTitle =
+        document.getElementById(
+            "resultTitle"
+        );
+
+    if (resultTitle) {
+
+        resultTitle.textContent =
+            data.pageTitle || "";
+    }
+
+
+    // ==========================================
+    // BROWSER
+    // ==========================================
+
+    const resultBrowser =
+        document.getElementById(
+            "resultBrowser"
+        );
+
+    if (resultBrowser) {
+
+        resultBrowser.textContent =
+            `${data.browser || ""} ${data.browserVersion || ""}`;
+    }
+
+
+    // ==========================================
+    // CAPTURE TIME
+    // ==========================================
+
+    const resultTime =
+        document.getElementById(
+            "resultTime"
+        );
+
+    if (resultTime) {
+
+        resultTime.textContent =
+            data.capturedAt || "";
+    }
 
 
     // ==========================================
@@ -433,34 +796,39 @@ function displayBugData(data) {
     // ==========================================
 
     const stepsContainer =
-        document.getElementById("stepsToReproduce");
-
-    stepsContainer.innerHTML = "";
-
-    if (
-        data.stepsToReproduce &&
-        data.stepsToReproduce.length > 0
-    ) {
-
-        data.stepsToReproduce.forEach(
-            (step, index) => {
-
-                const stepElement =
-                    document.createElement("p");
-
-                stepElement.textContent =
-                    `${index + 1}. ${step}`;
-
-                stepsContainer.appendChild(
-                    stepElement
-                );
-            }
+        document.getElementById(
+            "stepsToReproduce"
         );
 
-    } else {
+    if (stepsContainer) {
 
-        stepsContainer.textContent =
-            "No steps captured.";
+        stepsContainer.innerHTML = "";
+
+        if (
+            data.stepsToReproduce &&
+            data.stepsToReproduce.length > 0
+        ) {
+
+            data.stepsToReproduce.forEach(
+                (step, index) => {
+
+                    const stepElement =
+                        document.createElement("p");
+
+                    stepElement.textContent =
+                        `${index + 1}. ${step}`;
+
+                    stepsContainer.appendChild(
+                        stepElement
+                    );
+                }
+            );
+
+        } else {
+
+            stepsContainer.textContent =
+                "No steps captured.";
+        }
     }
 
 
@@ -468,16 +836,32 @@ function displayBugData(data) {
     // ACTUAL RESULT
     // ==========================================
 
-    document.getElementById("actualResult").textContent =
-        data.actualResult || "";
+    const actualResult =
+        document.getElementById(
+            "actualResult"
+        );
+
+    if (actualResult) {
+
+        actualResult.textContent =
+            data.actualResult || "";
+    }
 
 
     // ==========================================
     // EXPECTED RESULT
     // ==========================================
 
-    document.getElementById("expectedResult").textContent =
-        data.expectedResult || "";
+    const expectedResult =
+        document.getElementById(
+            "expectedResult"
+        );
+
+    if (expectedResult) {
+
+        expectedResult.textContent =
+            data.expectedResult || "";
+    }
 
 
     // ==========================================
@@ -485,66 +869,39 @@ function displayBugData(data) {
     // ==========================================
 
     const userActionsContainer =
-        document.getElementById("userActions");
-
-    userActionsContainer.innerHTML = "";
-
-    if (
-        data.userActions &&
-        data.userActions.length > 0
-    ) {
-
-        data.userActions.forEach(
-            (action, index) => {
-
-                const actionElement =
-                    document.createElement("p");
-
-                let stepText = "";
-
-                if (action.type === "CLICK") {
-
-                    stepText =
-                        `User clicked on "${
-                            action.element ||
-                            action.tag
-                        }"`;
-
-                } else if (
-                    action.type === "INPUT"
-                ) {
-
-                    stepText =
-                        `User entered "${
-                            action.value || ""
-                        }" in "${
-                            action.element ||
-                            action.placeholder ||
-                            action.tag
-                        }"`;
-
-                } else {
-
-                    stepText =
-                        `${action.type} on "${
-                            action.element ||
-                            action.tag
-                        }"`;
-                }
-
-                actionElement.textContent =
-                    `${index + 1}. ${stepText}`;
-
-                userActionsContainer.appendChild(
-                    actionElement
-                );
-            }
+        document.getElementById(
+            "userActions"
         );
 
-    } else {
+    if (userActionsContainer) {
 
-        userActionsContainer.textContent =
-            "No user actions captured.";
+        userActionsContainer.innerHTML = "";
+
+        if (
+            data.userActions &&
+            data.userActions.length > 0
+        ) {
+
+            data.userActions.forEach(
+                (action, index) => {
+
+                    const actionElement =
+                        document.createElement("p");
+
+                    actionElement.textContent =
+                        `${index + 1}. ${action.type} → ${action.value}`;
+
+                    userActionsContainer.appendChild(
+                        actionElement
+                    );
+                }
+            );
+
+        } else {
+
+            userActionsContainer.textContent =
+                "No user actions captured.";
+        }
     }
 
 
@@ -552,8 +909,77 @@ function displayBugData(data) {
     // SCREENSHOT
     // ==========================================
 
-    document.getElementById("screenshot").src =
-        data.screenshot || "";
+    const screenshotElement =
+        document.getElementById(
+            "screenshot"
+        );
+
+    if (screenshotElement) {
+
+        screenshotElement.src =
+            data.screenshot || "";
+    }
+
+
+    // ==========================================
+    // VIDEO
+    // ==========================================
+
+    const bugVideo =
+        document.getElementById(
+            "bugVideo"
+        );
+
+    const videoStatus =
+        document.getElementById(
+            "videoStatus"
+        );
+
+    if (bugVideo && videoStatus) {
+
+        if (
+            data.video &&
+            data.video.available === true
+        ) {
+
+            try {
+
+                const videoData =
+                    await getLatestBugVideo();
+
+                if (videoData) {
+
+                    bugVideo.src =
+                        URL.createObjectURL(
+                            videoData
+                        );
+
+                    videoStatus.textContent =
+                        "✅ Bug video recorded successfully.";
+
+                } else {
+
+                    videoStatus.textContent =
+                        "⚠️ Video not found.";
+                }
+
+            } catch (videoError) {
+
+                console.error(
+                    "Unable to load bug video:",
+                    videoError
+                );
+
+                videoStatus.textContent =
+                    "⚠️ Unable to load video.";
+            }
+
+        } else {
+
+            videoStatus.textContent =
+                "No video available.";
+        }
+    }
 
 
     // ==========================================
@@ -563,7 +989,800 @@ function displayBugData(data) {
     result.classList.remove("hidden");
 }
 
-//
+
+// ==========================================
+// SAVE / EDIT EXPECTED RESULT
+// ==========================================
+
+if (saveExpectedResultButton) {
+
+    saveExpectedResultButton.addEventListener(
+        "click",
+        async () => {
+
+            try {
+
+                hideError();
+
+                if (!bugData) {
+
+                    showError(
+                        "No bug data available."
+                    );
+
+                    return;
+                }
+
+
+                const editedExpectedResult =
+                    expectedResultInput
+                        ? expectedResultInput.value.trim()
+                        : "";
+
+
+                if (!editedExpectedResult) {
+
+                    showError(
+                        "Expected Result cannot be empty."
+                    );
+
+                    return;
+                }
+
+
+                // ==================================
+                // UPDATE BUG DATA
+                // ==================================
+
+                bugData.expectedResult =
+                    editedExpectedResult;
+
+
+                // ==================================
+                // MARK AS MANUAL
+                // ==================================
+
+                bugData.expectedResultSource =
+                    "MANUAL";
+
+                expectedResultSource =
+                    "MANUAL";
+
+
+                // ==================================
+                // UPDATE DISPLAY
+                // ==================================
+
+                const expectedResult =
+                    document.getElementById(
+                        "expectedResult"
+                    );
+
+                if (expectedResult) {
+
+                    expectedResult.textContent =
+                        editedExpectedResult;
+                }
+
+
+                // ==================================
+                // SAVE TO STORAGE
+                // ==================================
+
+                await chrome.storage.local.set({
+                    lastBugReport:
+                        bugData
+                });
+
+
+                // ==================================
+                // UPDATE SOURCE TEXT
+                // ==================================
+
+                const sourceElement =
+                    document.getElementById(
+                        "expectedResultSource"
+                    );
+
+                if (sourceElement) {
+
+                    sourceElement.textContent =
+                        "✏️ Manually edited";
+                }
+
+
+                // ==================================
+                // SHOW SUCCESS MESSAGE
+                // ==================================
+
+                if (expectedResultSaved) {
+
+                    expectedResultSaved.textContent =
+                        "✅ Expected Result updated successfully.";
+
+                    expectedResultSaved.classList.remove(
+                        "hidden"
+                    );
+
+                    setTimeout(
+                        () => {
+
+                            expectedResultSaved.classList.add(
+                                "hidden"
+                            );
+
+                        },
+                        2000
+                    );
+                }
+
+
+                console.log(
+                    "Expected Result updated:",
+                    editedExpectedResult
+                );
+
+            } catch (err) {
+
+                console.error(
+                    "Unable to save Expected Result:",
+                    err
+                );
+
+                showError(
+                    "Unable to save Expected Result."
+                );
+            }
+        }
+    );
+}
+
+
+// ==========================================
+// GENERATE CLEAN USER ACTIONS
+// ==========================================
+
+function generateUserActions(actions) {
+
+    if (
+        !actions ||
+        actions.length === 0
+    ) {
+        return [];
+    }
+
+
+    const cleanActions = [];
+
+
+    actions.forEach((action) => {
+
+        if (!action || !action.type) {
+            return;
+        }
+
+
+        // ======================================
+        // CLICK
+        // ======================================
+
+        if (action.type === "CLICK") {
+
+            const name =
+                getSmartActionName(action);
+
+            if (
+                !name ||
+                isTechnicalElement(name)
+            ) {
+                return;
+            }
+
+
+            cleanActions.push({
+                type: "CLICK",
+                value: name
+            });
+
+            return;
+        }
+
+
+        // ======================================
+        // INPUT
+        // ======================================
+
+        if (action.type === "INPUT") {
+
+            const value =
+                (action.value || "").trim();
+
+            if (!value) {
+                return;
+            }
+
+
+            const field =
+                getInputField(action);
+
+
+            const lastAction =
+                cleanActions[
+                    cleanActions.length - 1
+                ];
+
+
+            // Replace previous INPUT
+            // for same field
+
+            if (
+                lastAction &&
+                lastAction.type === "INPUT" &&
+                lastAction.field === field
+            ) {
+
+                lastAction.value =
+                    value;
+
+                return;
+            }
+
+
+            cleanActions.push({
+                type: "INPUT",
+                value: value,
+                field: field
+            });
+
+            return;
+        }
+
+
+        // ======================================
+        // OTHER ACTIONS
+        // ======================================
+
+        const name =
+            getSmartActionName(action);
+
+        if (
+            !name ||
+            isTechnicalElement(name)
+        ) {
+            return;
+        }
+
+
+        cleanActions.push({
+            type:
+                formatActionType(
+                    action.type
+                ),
+
+            value:
+                name
+        });
+
+    });
+
+
+    // Remove internal field
+    // before display
+
+    return cleanActions.map((action) => {
+
+        return {
+            type:
+                action.type,
+
+            value:
+                action.value
+        };
+
+    });
+}
+
+
+// ==========================================
+// GET INPUT FIELD
+// ==========================================
+
+function getInputField(action) {
+
+    if (!action) {
+        return "input field";
+    }
+
+
+    const field =
+        action.element ||
+        action.placeholder ||
+        action.name ||
+        action.id ||
+        "input field";
+
+
+    return String(field)
+        .trim()
+        .replace(/\s+/g, " ");
+}
+
+
+// ==========================================
+// GENERATE STEPS
+// ==========================================
+
+function generateSteps(actions) {
+
+    if (
+        !actions ||
+        actions.length === 0
+    ) {
+        return [];
+    }
+
+
+    const steps = [];
+    const cleanActions = [];
+
+
+    // ==========================================
+    // FIRST CLEAN ACTIONS
+    // ==========================================
+
+    actions.forEach((action) => {
+
+        if (!action || !action.type) {
+            return;
+        }
+
+
+        // ======================================
+        // CLICK
+        // ======================================
+
+        if (action.type === "CLICK") {
+
+            const elementName =
+                getSmartActionName(action);
+
+            if (
+                !elementName ||
+                isTechnicalElement(elementName)
+            ) {
+                return;
+            }
+
+
+            cleanActions.push({
+                type: "CLICK",
+                value: elementName
+            });
+
+            return;
+        }
+
+
+        // ======================================
+        // INPUT
+        // ======================================
+
+        if (action.type === "INPUT") {
+
+            const value =
+                (action.value || "").trim();
+
+            if (!value) {
+                return;
+            }
+
+
+            const field =
+                getInputField(action);
+
+
+            const lastAction =
+                cleanActions[
+                    cleanActions.length - 1
+                ];
+
+
+            if (
+                lastAction &&
+                lastAction.type === "INPUT" &&
+                lastAction.field === field
+            ) {
+
+                lastAction.value =
+                    value;
+
+                return;
+            }
+
+
+            cleanActions.push({
+                type: "INPUT",
+                value: value,
+                field: field
+            });
+
+            return;
+        }
+
+
+        // ======================================
+        // OTHER ACTIONS
+        // ======================================
+
+        const elementName =
+            getSmartActionName(action);
+
+        if (
+            !elementName ||
+            isTechnicalElement(elementName)
+        ) {
+            return;
+        }
+
+
+        cleanActions.push({
+            type:
+                formatActionType(
+                    action.type
+                ),
+
+            value:
+                elementName
+        });
+
+    });
+
+
+    // ==========================================
+    // CONVERT TO HUMAN READABLE STEPS
+    // ==========================================
+
+    cleanActions.forEach((action) => {
+
+        // CLICK
+
+        if (action.type === "CLICK") {
+
+            steps.push(
+                `Click on "${action.value}"`
+            );
+
+            return;
+        }
+
+
+        // INPUT
+
+        if (action.type === "INPUT") {
+
+            steps.push(
+                `Enter "${action.value}" in "${action.field}"`
+            );
+
+            return;
+        }
+
+
+        // OTHER
+
+        steps.push(
+            `${action.type} "${action.value}"`
+        );
+
+    });
+
+
+    return steps;
+}
+
+
+// ==========================================
+// SMART ACTION NAME
+// ==========================================
+
+function getSmartActionName(action) {
+
+    if (!action) {
+        return "";
+    }
+
+
+    const candidates = [
+
+        action.element,
+        action.ariaLabel,
+        action.title,
+        action.placeholder,
+        action.innerText,
+        action.textContent
+
+    ];
+
+
+    let name = "";
+
+
+    for (const candidate of candidates) {
+
+        if (!candidate) {
+            continue;
+        }
+
+
+        const value =
+            String(candidate)
+                .trim()
+                .replace(/\s+/g, " ");
+
+
+        if (!value) {
+            continue;
+        }
+
+
+        if (
+            isTechnicalElement(value)
+        ) {
+            continue;
+        }
+
+
+        name = value;
+
+        break;
+    }
+
+
+    if (!name) {
+        return "";
+    }
+
+
+    name =
+        simplifyElementText(name);
+
+
+    if (!name) {
+        return "";
+    }
+
+
+    if (
+        isTechnicalElement(name)
+    ) {
+        return "";
+    }
+
+
+    return name.substring(0, 150);
+}
+
+
+// ==========================================
+// SIMPLIFY ELEMENT TEXT
+// ==========================================
+
+function simplifyElementText(text) {
+
+    if (!text) {
+        return "";
+    }
+
+
+    let result =
+        String(text)
+            .trim()
+            .replace(/\s+/g, " ");
+
+
+    const lower =
+        result.toLowerCase();
+
+
+    if (
+        lower.includes("add to cart")
+    ) {
+        return "Add to Cart";
+    }
+
+
+    if (
+        lower.includes("add to compare")
+    ) {
+        return "Add to Compare";
+    }
+
+
+    if (
+        lower.includes("buy now")
+    ) {
+        return "Buy Now";
+    }
+
+
+    if (
+        lower === "remove" ||
+        lower.includes("remove")
+    ) {
+        return "Remove";
+    }
+
+
+    if (
+        lower === "continue" ||
+        lower.includes("continue")
+    ) {
+        return "Continue";
+    }
+
+
+    if (
+        lower === "submit" ||
+        lower.includes("submit")
+    ) {
+        return "Submit";
+    }
+
+
+    if (
+        lower.includes("search for products") ||
+        lower.includes(
+            "search for products, brands and more"
+        )
+    ) {
+        return "Search";
+    }
+
+
+    if (
+        lower.includes("checkout")
+    ) {
+        return "Checkout";
+    }
+
+
+    if (
+        lower.includes("place order")
+    ) {
+        return "Place Order";
+    }
+
+
+    if (
+        isTechnicalElement(result)
+    ) {
+        return "";
+    }
+
+
+    return result;
+}
+
+
+// ==========================================
+// IGNORE TECHNICAL ELEMENTS
+// ==========================================
+
+function isTechnicalElement(name) {
+
+    if (!name) {
+        return true;
+    }
+
+
+    const value =
+        String(name)
+            .trim()
+            .toLowerCase();
+
+
+    const technicalElements = [
+
+        "svg",
+        "path",
+        "div",
+        "span",
+        "img",
+        "section",
+        "article",
+        "button",
+        "input",
+        "textarea",
+        "select",
+        "option",
+        "unknown element"
+
+    ];
+
+
+    if (
+        technicalElements.includes(value)
+    ) {
+        return true;
+    }
+
+
+    // CSS classes
+
+    if (
+        /^css-[a-z0-9_-]+$/i.test(value)
+    ) {
+        return true;
+    }
+
+
+    // Generated class values
+
+    if (
+        /^[a-zA-Z0-9_-]+$/.test(value) &&
+        (
+            value.includes("_") ||
+            value.includes("-")
+        ) &&
+        value.length < 40
+    ) {
+
+        const meaningfulWords = [
+
+            "search",
+            "remove",
+            "continue",
+            "submit",
+            "checkout",
+            "cart",
+            "product",
+            "login",
+            "logout",
+            "cancel",
+            "save",
+            "update",
+            "delete",
+            "next",
+            "previous",
+            "back",
+            "close"
+
+        ];
+
+
+        if (
+            !meaningfulWords.includes(value)
+        ) {
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+// ==========================================
+// FORMAT ACTION TYPE
+// ==========================================
+
+function formatActionType(type) {
+
+    if (!type) {
+        return "Perform action on";
+    }
+
+
+    return type
+        .toLowerCase()
+        .replace(
+            /^[a-z]/,
+            (letter) =>
+                letter.toUpperCase()
+        );
+}
+
+
 // ==========================================
 // BROWSER DETECTION
 // ==========================================
@@ -574,18 +1793,16 @@ function getBrowserInfo() {
         navigator.userAgent;
 
 
-    let browser =
-        "Unknown";
-
-    let version =
-        "Unknown";
+    let browser = "Unknown";
+    let version = "Unknown";
 
 
     if (
         userAgent.includes("Edg/")
     ) {
 
-        browser = "Microsoft Edge";
+        browser =
+            "Microsoft Edge";
 
         version =
             userAgent.match(
@@ -598,7 +1815,8 @@ function getBrowserInfo() {
         userAgent.includes("Chrome/")
     ) {
 
-        browser = "Google Chrome";
+        browser =
+            "Google Chrome";
 
         version =
             userAgent.match(
@@ -611,7 +1829,8 @@ function getBrowserInfo() {
         userAgent.includes("Firefox/")
     ) {
 
-        browser = "Mozilla Firefox";
+        browser =
+            "Mozilla Firefox";
 
         version =
             userAgent.match(
@@ -624,13 +1843,13 @@ function getBrowserInfo() {
         userAgent.includes("Safari/")
     ) {
 
-        browser = "Safari";
+        browser =
+            "Safari";
 
         version =
             userAgent.match(
                 /Version\/([\d.]+)/
             )?.[1] || "Unknown";
-
     }
 
 
@@ -638,7 +1857,6 @@ function getBrowserInfo() {
         browser,
         version
     };
-
 }
 
 
@@ -646,53 +1864,61 @@ function getBrowserInfo() {
 // COPY JSON
 // ==========================================
 
-copyJsonButton.addEventListener(
-    "click",
-    async () => {
+if (copyJsonButton) {
 
-        if (!bugData) {
+    copyJsonButton.addEventListener(
+        "click",
+        async () => {
 
-            showError(
-                "No bug data available."
-            );
+            if (!bugData) {
 
-            return;
-        }
+                showError(
+                    "No bug data available."
+                );
 
-
-        try {
-
-            await navigator.clipboard.writeText(
-                JSON.stringify(
-                    bugData,
-                    null,
-                    2
-                )
-            );
+                return;
+            }
 
 
-            copyJsonButton.textContent =
-                "✅ Copied!";
+            try {
 
+                await navigator.clipboard.writeText(
+                    JSON.stringify(
+                        bugData,
+                        null,
+                        2
+                    )
+                );
 
-            setTimeout(() => {
 
                 copyJsonButton.textContent =
-                    "📋 Copy Bug Data";
-
-            }, 2000);
+                    "✅ Copied!";
 
 
-        } catch (err) {
+                setTimeout(
+                    () => {
 
-            showError(
-                "Unable to copy bug data."
-            );
+                        copyJsonButton.textContent =
+                            "📋 Copy Bug Data";
 
+                    },
+                    2000
+                );
+
+            } catch (err) {
+
+                console.error(
+                    "Copy failed:",
+                    err
+                );
+
+                showError(
+                    "Unable to copy bug data."
+                );
+            }
         }
-
-    }
-);
+    );
+}
 
 
 // ==========================================
@@ -701,23 +1927,32 @@ copyJsonButton.addEventListener(
 
 function showError(message) {
 
+    if (!error) {
+        return;
+    }
+
+
     error.textContent =
         message;
 
     error.classList.remove(
         "hidden"
     );
-
 }
 
 
 function hideError() {
 
+    if (!error) {
+        return;
+    }
+
+
     error.classList.add(
         "hidden"
     );
-
 }
+
 
 // ==========================================
 // GENERATE BUG TITLE
@@ -729,54 +1964,10 @@ function generateBugTitle(description) {
         return "Bug Report";
     }
 
+
     return description
         .trim()
         .replace(/\.$/, "");
-}
-
-// ==========================================
-// GENERATE STEPS
-// ==========================================
-
-function generateSteps(actions) {
-
-    if (!actions || actions.length === 0) {
-        return [];
-    }
-
-    return actions.map(
-        (action) => {
-
-            if (action.type === "CLICK") {
-
-                return `Click on "${
-                    action.element ||
-                    action.tag ||
-                    "element"
-                }"`;
-
-            }
-
-            if (action.type === "INPUT") {
-
-                return `Enter "${
-                    action.value || ""
-                }" in "${
-                    action.element ||
-                    action.placeholder ||
-                    action.tag ||
-                    "field"
-                }"`;
-
-            }
-
-            return `${action.type} on "${
-                action.element ||
-                action.tag ||
-                "element"
-            }"`;
-        }
-    );
 }
 
 
@@ -786,147 +1977,540 @@ function generateSteps(actions) {
 
 function generateExpectedResult(description) {
 
-    if (!description || !description.trim()) {
-        return "The application should behave as per the defined requirements.";
+    expectedResultSource =
+        "DEFAULT";
+
+
+    if (
+        !description ||
+        !description.trim()
+    ) {
+
+        return "The functionality should work as per the defined requirements.";
     }
 
-    const original = description.trim();
-    const text = original.toLowerCase();
+
+    const original =
+        description.trim();
+
+    const text =
+        original.toLowerCase();
 
 
     // ==========================================
-    // NOT APPEARING / NOT DISPLAYED
+    // RULE 1 - NOT APPEARING / NOT VISIBLE
     // ==========================================
 
     if (
+
         text.includes("not appearing") ||
         text.includes("not visible") ||
         text.includes("not displayed") ||
         text.includes("not showing") ||
         text.includes("not shown") ||
         text.includes("missing")
+
     ) {
 
-        let subject = original;
+        expectedResultSource =
+            "RULE_ENGINE";
 
-        subject = subject
-            .replace(/\s+is\s+not\s+appearing.*$/i, "")
-            .replace(/\s+is\s+not\s+visible.*$/i, "")
-            .replace(/\s+is\s+not\s+displayed.*$/i, "")
-            .replace(/\s+is\s+not\s+showing.*$/i, "")
-            .replace(/\s+is\s+not\s+shown.*$/i, "")
-            .replace(/\s+is\s+missing.*$/i, "")
-            .trim();
+
+        const subject =
+            removeFailurePhrase(original);
+
+
+        if (text.includes("under")) {
+
+            const parts =
+                subject.split(
+                    /\s+under\s+/i
+                );
+
+
+            if (parts.length === 2) {
+
+                return `${capitalize(parts[0])} should be displayed correctly under ${parts[1]}.`;
+            }
+        }
+
 
         return `${capitalize(subject)} should be displayed correctly to the user.`;
     }
 
 
     // ==========================================
-    // NOT WORKING
+    // RULE 2 - NOT WORKING
     // ==========================================
 
     if (
+
         text.includes("not working") ||
         text.includes("does not work") ||
         text.includes("not functioning") ||
         text.includes("not responding")
+
     ) {
 
-        let subject = original;
+        expectedResultSource =
+            "RULE_ENGINE";
 
-        subject = subject
-            .replace(/\s+is\s+not\s+working.*$/i, "")
-            .replace(/\s+does\s+not\s+work.*$/i, "")
-            .replace(/\s+is\s+not\s+functioning.*$/i, "")
-            .replace(/\s+is\s+not\s+responding.*$/i, "")
-            .trim();
+
+        const subject =
+            removeFailurePhrase(original);
+
 
         return `${capitalize(subject)} should work correctly as per the expected functionality.`;
     }
 
 
     // ==========================================
-    // NOT SAVING
+    // RULE 3 - NOT SAVING
     // ==========================================
 
     if (
+
         text.includes("not saving") ||
         text.includes("does not save") ||
-        text.includes("not saved")
+        text.includes("not saved") ||
+        text.includes("unable to save")
+
     ) {
 
-        let subject = original;
+        expectedResultSource =
+            "RULE_ENGINE";
 
-        subject = subject
-            .replace(/\s+is\s+not\s+saving.*$/i, "")
-            .replace(/\s+does\s+not\s+save.*$/i, "")
-            .replace(/\s+is\s+not\s+saved.*$/i, "")
-            .trim();
+
+        const subject =
+            removeFailurePhrase(original);
+
 
         return `${capitalize(subject)} should be saved successfully.`;
     }
 
 
     // ==========================================
-    // NOT LOADING
+    // RULE 4 - NOT LOADING
     // ==========================================
 
     if (
+
         text.includes("not loading") ||
-        text.includes("does not load")
+        text.includes("does not load") ||
+        text.includes("failed to load")
+
     ) {
 
-        let subject = original;
+        expectedResultSource =
+            "RULE_ENGINE";
 
-        subject = subject
-            .replace(/\s+is\s+not\s+loading.*$/i, "")
-            .replace(/\s+does\s+not\s+load.*$/i, "")
-            .trim();
+
+        const subject =
+            removeFailurePhrase(original);
+
 
         return `${capitalize(subject)} should load successfully without any error.`;
     }
 
 
     // ==========================================
-    // WRONG / INCORRECT DATA
+    // RULE 5 - WRONG DATA
     // ==========================================
 
     if (
+
         text.includes("wrong data") ||
         text.includes("incorrect data") ||
         text.includes("wrong value") ||
-        text.includes("incorrect value")
+        text.includes("incorrect value") ||
+        text.includes("invalid data")
+
     ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
 
         return "The system should display the correct data as per the defined requirements.";
     }
 
 
     // ==========================================
-    // DUPLICATE
+    // RULE 6 - DUPLICATE
     // ==========================================
 
     if (
+
         text.includes("duplicate") ||
         text.includes("duplicated")
+
     ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
 
         return "Duplicate records or elements should not be created or displayed.";
     }
 
 
     // ==========================================
-    // ERROR
+    // RULE 7 - ERROR
     // ==========================================
 
     if (
+
         text.includes("error") ||
         text.includes("exception") ||
         text.includes("failed")
+
     ) {
 
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
         return "The operation should complete successfully without displaying any unexpected error.";
+    }
+
+
+    // ==========================================
+    // RULE 8 - CRASH
+    // ==========================================
+
+    if (
+
+        text.includes("crash") ||
+        text.includes("crashed")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The application should remain stable and should not crash.";
+    }
+
+
+    // ==========================================
+    // RULE 9 - FREEZE
+    // ==========================================
+
+    if (
+
+        text.includes("freeze") ||
+        text.includes("frozen")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The application should remain responsive and allow the user to continue the intended operation.";
+    }
+
+
+    // ==========================================
+    // RULE 10 - PERFORMANCE
+    // ==========================================
+
+    if (
+
+        text.includes("slow") ||
+        text.includes("taking too long") ||
+        text.includes("timeout") ||
+        text.includes("performance issue")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The operation should complete within the expected response time without performance issues.";
+    }
+
+
+    // ==========================================
+    // RULE 11 - WRONG COUNT
+    // ==========================================
+
+    if (
+
+        text.includes("wrong count") ||
+        text.includes("incorrect count") ||
+        text.includes("count mismatch")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The system should display the correct count according to the available records and applied filters.";
+    }
+
+
+    // ==========================================
+    // RULE 12 - PAGINATION
+    // ==========================================
+
+    if (
+
+        text.includes("pagination") ||
+        text.includes("next page") ||
+        text.includes("previous page")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "Pagination should work correctly and display the appropriate records for the selected page.";
+    }
+
+
+    // ==========================================
+    // RULE 13 - LOGIN
+    // ==========================================
+
+    if (
+
+        text.includes("login failed") ||
+        text.includes("unable to login") ||
+        text.includes("cannot login") ||
+        text.includes("login not working")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The user should be able to log in successfully with valid credentials.";
+    }
+
+
+    // ==========================================
+    // RULE 14 - SEARCH
+    // ==========================================
+
+    if (
+
+        text.includes("search not working") ||
+        text.includes("search does not work") ||
+        text.includes("unable to search")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The search functionality should return the relevant results based on the entered search criteria.";
+    }
+
+
+    // ==========================================
+    // RULE 15 - FILTER
+    // ==========================================
+
+    if (
+
+        text.includes("filter not working") ||
+        text.includes("filter does not work") ||
+        text.includes("filter issue")
+
+    ) {
+
+        expectedResultSource =
+            "RULE_ENGINE";
+
+
+        return "The selected filter should be applied correctly and only matching records should be displayed.";
+    }
+
+
+    // ==========================================
+    // AI FALLBACK
+    // ==========================================
+
+    return generateExpectedResultWithAIFallback(
+        original
+    );
+}
+
+
+// ==========================================
+// REMOVE FAILURE PHRASE
+// ==========================================
+
+function removeFailurePhrase(text) {
+
+    if (!text) {
+        return "The affected functionality";
+    }
+
+
+    return text
+
+        .replace(
+            /\s+is\s+not\s+appearing\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+visible\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+displayed\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+showing\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+shown\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+missing\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+working\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+does\s+not\s+work\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+functioning\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+responding\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+saving\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+does\s+not\s+save\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+saved\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+is\s+not\s+loading\.?$/i,
+            ""
+        )
+
+        .replace(
+            /\s+does\s+not\s+load\.?$/i,
+            ""
+        )
+
+        .trim();
+}
+
+
+// ==========================================
+// AI FALLBACK
+// ==========================================
+
+function generateExpectedResultWithAIFallback(
+    description
+) {
+
+    expectedResultSource =
+        "AI_FALLBACK";
+
+
+    if (!description) {
+
+        expectedResultSource =
+            "DEFAULT";
+
+        return "The functionality should work as per the defined requirements.";
+    }
+
+
+    const text =
+        description.toLowerCase();
+
+
+    // ==========================================
+    // NOT AVAILABLE
+    // ==========================================
+
+    if (
+
+        text.includes("not available") ||
+        text.includes("unavailable")
+
+    ) {
+
+        const subject =
+            removeFailurePhrase(
+                description
+            );
+
+
+        return `${capitalize(subject)} should be available to the user when the applicable conditions are met.`;
+    }
+
+
+    // ==========================================
+    // DISPLAY
+    // ==========================================
+
+    if (
+
+        text.includes("display") ||
+        text.includes("shown") ||
+        text.includes("visible")
+
+    ) {
+
+        return "The relevant information should be displayed correctly and clearly to the user.";
+    }
+
+
+    // ==========================================
+    // DATA
+    // ==========================================
+
+    if (
+
+        text.includes("data") ||
+        text.includes("record") ||
+        text.includes("value")
+
+    ) {
+
+        return "The system should display and process the correct data according to the defined business requirements.";
     }
 
 
@@ -934,7 +2518,7 @@ function generateExpectedResult(description) {
     // DEFAULT
     // ==========================================
 
-    return "The functionality should work as per the defined requirements.";
+    return "The reported functionality should behave correctly according to the defined business requirements.";
 }
 
 
@@ -948,5 +2532,122 @@ function capitalize(text) {
         return "The affected functionality";
     }
 
-    return text.charAt(0).toUpperCase() + text.slice(1);
+
+    return (
+        text.charAt(0).toUpperCase() +
+        text.slice(1)
+    );
+}
+
+
+// ==========================================
+// GET LATEST BUG VIDEO
+// ==========================================
+
+function getLatestBugVideo() {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            const request =
+                indexedDB.open(
+                    "AIBugReporterDB",
+                    1
+                );
+
+
+            request.onerror = () => {
+
+                reject(
+                    request.error
+                );
+            };
+
+
+            request.onsuccess = () => {
+
+                const db =
+                    request.result;
+
+
+                // Check whether videos store exists
+
+                if (
+                    !db.objectStoreNames.contains(
+                        "videos"
+                    )
+                ) {
+
+                    db.close();
+
+                    resolve(null);
+
+                    return;
+                }
+
+
+                try {
+
+                    const transaction =
+                        db.transaction(
+                            "videos",
+                            "readonly"
+                        );
+
+
+                    const store =
+                        transaction.objectStore(
+                            "videos"
+                        );
+
+
+                    const getRequest =
+                        store.get(
+                            "latestBugVideo"
+                        );
+
+
+                    getRequest.onsuccess = () => {
+
+                        const videoResult =
+                            getRequest.result;
+
+
+                        db.close();
+
+
+                        if (
+                            videoResult &&
+                            videoResult.blob
+                        ) {
+
+                            resolve(
+                                videoResult.blob
+                            );
+
+                        } else {
+
+                            resolve(null);
+                        }
+                    };
+
+
+                    getRequest.onerror = () => {
+
+                        db.close();
+
+                        reject(
+                            getRequest.error
+                        );
+                    };
+
+                } catch (err) {
+
+                    db.close();
+
+                    reject(err);
+                }
+            };
+        }
+    );
 }

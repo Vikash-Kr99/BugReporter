@@ -1,13 +1,14 @@
 const MAX_ACTIONS = 50;
 
-let userActions = [];
 
 // ==========================================
 // RECORD ACTION
 // ==========================================
 
 async function recordAction(action) {
+
     try {
+
         const result = await chrome.storage.local.get([
             "captureActive",
             "userActions"
@@ -16,36 +17,73 @@ async function recordAction(action) {
         const captureActive =
             result.captureActive === true;
 
+        // Recording is not active
         if (!captureActive) {
             return;
         }
 
-        userActions = result.userActions || [];
+        let userActions =
+            result.userActions || [];
+
+
+        // --------------------------------------
+        // Create new action
+        // --------------------------------------
 
         const newAction = {
             ...action,
             timestamp: new Date().toISOString()
         };
 
-        console.log("USER ACTION:", newAction);
+
+        console.log(
+            "USER ACTION:",
+            newAction
+        );
+
+
+        // --------------------------------------
+        // Add action
+        // --------------------------------------
 
         userActions.push(newAction);
 
-        if (userActions.length > MAX_ACTIONS) {
-            userActions = userActions.slice(-MAX_ACTIONS);
+
+        // --------------------------------------
+        // Keep latest 50 actions
+        // --------------------------------------
+
+        if (
+            userActions.length >
+            MAX_ACTIONS
+        ) {
+
+            userActions =
+                userActions.slice(
+                    -MAX_ACTIONS
+                );
         }
+
+
+        // --------------------------------------
+        // Save
+        // --------------------------------------
 
         await chrome.storage.local.set({
             userActions: userActions
         });
 
-    } catch (error) {
+    }
+    catch (error) {
+
         console.error(
             "Failed to record user action:",
             error
         );
     }
 }
+
+
 
 // ==========================================
 // CLICK TRACKING
@@ -55,21 +93,45 @@ document.addEventListener(
     "click",
     (event) => {
 
-        const element = event.target;
+        let element =
+            getMeaningfulElement(
+                event.target
+            );
 
-       recordAction({
-    type: "CLICK",
-    element: getElementName(element),
-    tag: element.tagName,
-    id: element.id || "",
-    className:
-        typeof element.className === "string"
-            ? element.className
-            : ""
-});
+
+        recordAction({
+
+            type: "CLICK",
+
+            element:
+                getElementName(element),
+
+            tag:
+                element.tagName,
+
+            id:
+                element.id || "",
+
+            className:
+                typeof element.className === "string"
+                    ? element.className
+                    : "",
+
+            role:
+                element.getAttribute("role") || "",
+
+            ariaLabel:
+                element.getAttribute("aria-label") || "",
+
+            title:
+                element.getAttribute("title") || ""
+        });
+
     },
     true
 );
+
+
 
 // ==========================================
 // INPUT TRACKING
@@ -79,76 +141,328 @@ document.addEventListener(
     "input",
     (event) => {
 
-        const element = event.target;
+        const element =
+            event.target;
+
 
         recordAction({
-    type: "INPUT",
-    element: getElementName(element),
-    tag: element.tagName,
-    id: element.id || "",
-    name: element.name || "",
-    placeholder: element.placeholder || "",
-    value: element.value || ""
-});
+
+            type: "INPUT",
+
+            element:
+                getElementName(element),
+
+            tag:
+                element.tagName,
+
+            id:
+                element.id || "",
+
+            name:
+                element.name || "",
+
+            placeholder:
+                element.placeholder || "",
+
+            value:
+                element.value || "",
+
+            typeAttribute:
+                element.type || ""
+        });
+
     },
     true
 );
 
+
+
 // ==========================================
-// ELEMENT TEXT
+// FIND MEANINGFUL ELEMENT
+// ==========================================
+
+function getMeaningfulElement(element) {
+
+    if (!element) {
+        return document.body;
+    }
+
+
+    // --------------------------------------
+    // If clicked element itself is meaningful
+    // --------------------------------------
+
+    const meaningfulTags = [
+        "BUTTON",
+        "A",
+        "INPUT",
+        "SELECT",
+        "TEXTAREA",
+        "OPTION",
+        "LABEL"
+    ];
+
+
+    if (
+        meaningfulTags.includes(
+            element.tagName
+        )
+    ) {
+
+        return element;
+    }
+
+
+    // --------------------------------------
+    // Check parent elements
+    // --------------------------------------
+
+    const parent =
+        element.closest(
+            "button, a, input, select, textarea, option, label"
+        );
+
+
+    if (parent) {
+        return parent;
+    }
+
+
+    // --------------------------------------
+    // Check role
+    // --------------------------------------
+
+    const roleElement =
+        element.closest(
+            '[role="button"], [role="link"], [role="checkbox"], [role="radio"], [role="tab"], [role="menuitem"]'
+        );
+
+
+    if (roleElement) {
+        return roleElement;
+    }
+
+
+    return element;
+}
+
+
+
+// ==========================================
+// GET ELEMENT NAME
 // ==========================================
 
 function getElementName(element) {
 
     if (!element) {
-        return "";
+        return "Unknown element";
     }
 
-    // 1. Visible text
+
+    // --------------------------------------
+    // 1. aria-label
+    // --------------------------------------
+
+    const ariaLabel =
+        element.getAttribute(
+            "aria-label"
+        );
+
+    if (
+        ariaLabel &&
+        ariaLabel.trim()
+    ) {
+
+        return cleanText(
+            ariaLabel
+        );
+    }
+
+
+    // --------------------------------------
+    // 2. title
+    // --------------------------------------
+
+    const title =
+        element.getAttribute(
+            "title"
+        );
+
+    if (
+        title &&
+        title.trim()
+    ) {
+
+        return cleanText(
+            title
+        );
+    }
+
+
+    // --------------------------------------
+    // 3. placeholder
+    // --------------------------------------
+
+    const placeholder =
+        element.getAttribute(
+            "placeholder"
+        );
+
+    if (
+        placeholder &&
+        placeholder.trim()
+    ) {
+
+        return cleanText(
+            placeholder
+        );
+    }
+
+
+    // --------------------------------------
+    // 4. Input value
+    // --------------------------------------
+
+    if (
+        element.tagName === "INPUT" &&
+        element.value
+    ) {
+
+        return cleanText(
+            element.value
+        );
+    }
+
+
+    // --------------------------------------
+    // 5. Button text
+    // --------------------------------------
+
+    if (
+        element.tagName === "BUTTON"
+    ) {
+
+        const buttonText =
+            element.innerText ||
+            element.textContent ||
+            "";
+
+        if (
+            buttonText.trim()
+        ) {
+
+            return cleanText(
+                buttonText
+            );
+        }
+    }
+
+
+    // --------------------------------------
+    // 6. Link text
+    // --------------------------------------
+
+    if (
+        element.tagName === "A"
+    ) {
+
+        const linkText =
+            element.innerText ||
+            element.textContent ||
+            "";
+
+        if (
+            linkText.trim()
+        ) {
+
+            return cleanText(
+                linkText
+            );
+        }
+    }
+
+
+    // --------------------------------------
+    // 7. Visible text
+    // --------------------------------------
+
     const text =
         element.innerText ||
         element.textContent ||
         "";
 
-    if (text.trim()) {
-        return text
-            .trim()
-            .replace(/\s+/g, " ")
-            .substring(0, 100);
+    if (
+        text.trim()
+    ) {
+
+        return cleanText(
+            text
+        );
     }
 
-    // 2. aria-label
-    if (element.getAttribute("aria-label")) {
-        return element
-            .getAttribute("aria-label")
-            .trim();
+
+    // --------------------------------------
+    // 8. Name attribute
+    // --------------------------------------
+
+    const name =
+        element.getAttribute(
+            "name"
+        );
+
+    if (
+        name &&
+        name.trim()
+    ) {
+
+        return cleanText(
+            name
+        );
     }
 
-    // 3. title
-    if (element.getAttribute("title")) {
-        return element
-            .getAttribute("title")
-            .trim();
-    }
 
-    // 4. placeholder
-    if (element.getAttribute("placeholder")) {
-        return element
-            .getAttribute("placeholder")
-            .trim();
-    }
+    // --------------------------------------
+    // 9. ID
+    // --------------------------------------
 
-    // 5. input name
-    if (element.getAttribute("name")) {
-        return element
-            .getAttribute("name")
-            .trim();
-    }
+    if (
+        element.id
+    ) {
 
-    // 6. ID
-    if (element.id) {
         return element.id;
     }
 
-    return "";
+
+    // --------------------------------------
+    // 10. Class
+    // --------------------------------------
+
+    if (
+        typeof element.className === "string" &&
+        element.className.trim()
+    ) {
+
+        return element.className
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .join(" ");
+    }
+
+
+    return element.tagName;
+}
+
+
+
+// ==========================================
+// CLEAN TEXT
+// ==========================================
+
+function cleanText(text) {
+
+    return text
+        .trim()
+        .replace(/\s+/g, " ")
+        .substring(0, 100);
 }
