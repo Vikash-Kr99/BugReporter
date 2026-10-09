@@ -1,33 +1,27 @@
 {
   "manifest_version": 3,
-
   "name": "AI Bug Reporter",
-
-  "version": "1.2.0",
-
-  "description": "AI powered bug reporting Chrome extension",
-
+  "version": "1.2.2",
+  "description": "Capture user actions, screenshots, video and generate structured bug reports.",
   "permissions": [
     "activeTab",
     "tabs",
     "storage",
+    "scripting",
     "tabCapture",
     "offscreen",
     "downloads"
   ],
-
   "host_permissions": [
     "<all_urls>"
   ],
-
   "action": {
+    "default_title": "AI Bug Reporter",
     "default_popup": "popup.html"
   },
-
   "background": {
     "service_worker": "background.js"
   },
-
   "content_scripts": [
     {
       "matches": [

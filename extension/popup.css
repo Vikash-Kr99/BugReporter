@@ -178,3 +178,16 @@ button:hover {
 
     font-size: 12px;
 }
+
+.media-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+.media-buttons button {
+    flex: 1;
+    padding: 8px 10px;
+    cursor: pointer;
+}
